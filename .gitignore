@@ -1,0 +1,34 @@
+# Config with secrets
+config.py
+
+# Service account keys
+*.json
+!package.json
+
+# Output directories
+analysis_output/
+temp_videos/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

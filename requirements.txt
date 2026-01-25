@@ -1,0 +1,14 @@
+# Google Cloud / Vertex AI
+google-cloud-aiplatform>=1.38.0
+google-auth>=2.23.0
+
+# Video/Image Processing
+opencv-python>=4.8.0
+Pillow>=10.0.0
+
+# Audio Processing
+pydub>=0.25.0
+SpeechRecognition>=3.10.0
+
+# Utilities
+python-dotenv>=1.0.0
