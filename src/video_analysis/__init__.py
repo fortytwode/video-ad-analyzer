@@ -22,6 +22,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+from .local_media import selected_media
 from .models import MarketingAnalysis, MarketingDimension, HookAnalysis
 from .core import VideoExtractor, MarketingAnalyzer, PromptManager
 
@@ -126,7 +127,7 @@ def initialize_gemini(service_account_path=None, project_id=None, location=None,
 
 
 def analyze_video(video_path, gemini_model=None, prompt_manager=None, output_dir=None,
-                  temp_dir=None, skip_save=False, model_name=None, api_delay=None):
+                  temp_dir=None, skip_save=False, model_name=None, api_delay=None, *, directory_fd=None):
     """
     Main analysis function for video or image.
 
@@ -143,6 +144,17 @@ def analyze_video(video_path, gemini_model=None, prompt_manager=None, output_dir
     Returns:
         tuple: (raw_content dict, marketing_analysis object)
     """
+    temp_dir = temp_dir or getattr(_config, "TEMP_DIR", "temp_videos")
+    os.makedirs(temp_dir, exist_ok=True)
+    with selected_media(video_path, directory_fd=directory_fd, temp_dir=temp_dir) as local_path:
+        return _analyze_selected_media(
+            local_path, os.fspath(video_path), gemini_model, prompt_manager,
+            output_dir, temp_dir, skip_save, model_name, api_delay,
+        )
+
+
+def _analyze_selected_media(video_path, original_path, gemini_model, prompt_manager,
+                            output_dir, temp_dir, skip_save, model_name, api_delay):
     import time
     import json
 
@@ -188,7 +200,7 @@ def analyze_video(video_path, gemini_model=None, prompt_manager=None, output_dir
         # Extract audio and transcribe (skip for images)
         transcript = None
         if not is_image:
-            audio_path = os.path.join(temp_dir, f"{os.path.basename(video_path)}.wav")
+            audio_path = video_path + ".wav"
             mp3_path = extractor.extract_audio(video_path, audio_path)
 
             if mp3_path:
@@ -262,8 +274,8 @@ def analyze_video(video_path, gemini_model=None, prompt_manager=None, output_dir
 
         # Prepare raw_content
         raw_content = {
-            "video_path": video_path,
-            "duration": _get_video_duration(video_path),
+            "video_path": original_path,
+            "duration": "00:00" if is_image else _get_video_duration(video_path),
             "transcript": transcript,
             "text_timeline": timeline
         }

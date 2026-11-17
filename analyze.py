@@ -68,7 +68,7 @@ def load_config():
     return config
 
 
-def get_video_files(directory):
+def get_video_files(directory, *, directory_fd=None):
     """Get all video/image files from a directory."""
     config = load_config()
 
@@ -76,14 +76,12 @@ def get_video_files(directory):
     image_ext = getattr(config, 'IMAGE_EXTENSIONS', {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'})
     all_ext = video_ext | image_ext
 
-    files = []
-    directory = Path(directory)
-
-    for ext in all_ext:
-        files.extend(directory.glob(f'*{ext}'))
-        files.extend(directory.glob(f'*{ext.upper()}'))
-
-    return sorted([str(f) for f in files])
+    with os.scandir(directory if directory_fd is None else directory_fd) as entries:
+        return sorted(
+            str(Path(directory, entry.name))
+            for entry in entries
+            if Path(entry.name).suffix.lower() in all_ext and entry.is_file(follow_symlinks=False)
+        )
 
 
 def analyze_single(video_path, output_dir=None, model=None):
@@ -116,13 +114,21 @@ def analyze_single(video_path, output_dir=None, model=None):
 
 def analyze_batch(directory, output_dir=None, model=None, max_videos=None):
     """Analyze all videos in a directory."""
+    directory_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        return _analyze_directory(directory, directory_fd, output_dir, model, max_videos)
+    finally:
+        os.close(directory_fd)
+
+
+def _analyze_directory(directory, directory_fd, output_dir, model, max_videos):
     from video_analysis import analyze_video, initialize_gemini
     from video_analysis.core import PromptManager
 
     config = load_config()
 
     # Get video files
-    video_files = get_video_files(directory)
+    video_files = get_video_files(directory, directory_fd=directory_fd)
 
     if not video_files:
         logger.error(f"No video/image files found in {directory}")
@@ -162,6 +168,7 @@ def analyze_batch(directory, output_dir=None, model=None, max_videos=None):
                 video_path,
                 gemini_model=gemini_model,
                 prompt_manager=prompt_manager,
+                directory_fd=directory_fd,
                 skip_save=True  # We'll save consolidated results
             )
 
